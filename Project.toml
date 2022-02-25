@@ -3,8 +3,18 @@ uuid = "e92a6803-064b-4f02-865b-9067f1abd426"
 authors = ["rejuvyesh <mail@rejuvyesh.com> and contributors"]
 version = "0.1.0"
 
+[deps]
+Configurations = "5218b696-f38b-4ac9-8b61-a12ec717816d"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+
 [compat]
+Configurations = "0.17"
+Distributions = "0.25"
 julia = "1"
+Flux = "0.12"
+
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
