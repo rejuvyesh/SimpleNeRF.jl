@@ -1,0 +1,13 @@
+name = "SimpleNeRF"
+uuid = "e92a6803-064b-4f02-865b-9067f1abd426"
+authors = ["rejuvyesh <mail@rejuvyesh.com> and contributors"]
+version = "0.1.0"
+
+[compat]
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
