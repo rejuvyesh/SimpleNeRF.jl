@@ -2,6 +2,7 @@ module SimpleNeRF
 
 using Random
 
+using ArgCheck
 using Distributions
 using Flux
 using Configurations
