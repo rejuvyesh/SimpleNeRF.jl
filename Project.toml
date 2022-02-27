@@ -17,6 +17,7 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 [compat]
 Configurations = "0.17"
 Distributions = "0.25"
+FileIO = "1"
 Flux = "0.12"
 julia = "1"
 
