@@ -15,6 +15,7 @@ JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
 [compat]
+ArgCheck = "2"
 Configurations = "0.17"
 Distributions = "0.25"
 FileIO = "1"
