@@ -11,8 +11,11 @@ FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
 Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
 ImageIO = "82e4d734-157c-48bb-816b-45c225c6df19"
 Images = "916415d5-f1e6-5110-898d-aaa5f9f070e0"
+JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
 JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
+ProgressLogging = "33c8b6b6-d38a-422a-b730-caa89a2f386c"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+ResumableFunctions = "c5292f4c-5179-55e1-98c5-05642aab7184"
 
 [compat]
 ArgCheck = "2"

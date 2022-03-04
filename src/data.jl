@@ -3,8 +3,11 @@ using ImageIO
 using Images: channelview
 using LinearAlgebra
 using ArgCheck
-
+using Random
 using JSON3
+using JLD2
+using ProgressLogging
+using ResumableFunctions
 
 using JSON3.StructTypes: StructType, Struct
 
@@ -56,7 +59,7 @@ function bare_rays(cv::CameraView, width::Int, height::Int)
     co = reshape(co, size(co)..., 1, 1)
     origins = reshape(repeat(co, 1, width, height), 3, 1, :)
     @check size(origins) == size(directions) == (3, 1, height*width)
-    return hcat(origins, directions)
+    return Float32.(hcat(origins, directions))
 end
 
 struct FileNeRF
@@ -109,3 +112,77 @@ end
 
 Base.length(d::NeRFDataset) = length(d.views)
 Base.getindex(d::NeRFDataset, idx::Integer) = rays(d.views[idx])
+
+@resumable function iterate_batches(ds::NeRFDataset, savepath::AbstractString; rng::AbstractRNG=Random.GLOBAL_RNG, num_shards::Int=32, batch_size::Int=512, repeat::Bool=true)
+    sd = ShardedNeRFDataset(ds, savepath; rng, num_shards)
+    for batch in iterate_batches(sd; batch_size, rng, repeat)
+        @yield batch
+    end
+end
+
+struct ShardedNeRFDataset{S<:AbstractString}
+    files::Vector{S}
+end
+
+function ShardedNeRFDataset(path::AbstractString)
+    files = filter!(endswith("jld2"), readdir(path; join=true))
+    @check length(files) > 0
+    return ShardedNeRFDataset(files)
+end
+
+Base.length(ds::ShardedNeRFDataset) = length(ds.files)
+
+function ShardedNeRFDataset(ds::NeRFDataset, savepath::AbstractString; rng::AbstractRNG=Random.GLOBAL_RNG, num_shards::Int=32)
+    if !isdir(savepath)
+        mkpath(savepath)
+    end
+    shards = Vector{Array{Float32,3}}(undef, num_shards)
+    @progress for view in ds.views
+        rs = rays(view)
+        assignments = rand(rng, 1:num_shards, (size(rs)[end],))
+        for sid in 1:num_shards
+            sub_batch = rs[:, :, assignments .== sid]
+            if size(sub_batch, 3) > 0
+                try
+                    shards[sid] = cat(shards[sid], sub_batch; dims=3)
+                catch e
+                    if e isa UndefRefError
+                        shards[sid] = sub_batch
+                    end
+                end
+            end
+        end
+    end
+    files = [joinpath(savepath, "$i.jld2") for i in 1:num_shards]
+    for i in 1:num_shards
+        jldopen(files[i], "w") do f
+            f["rays"] = shards[i]
+        end
+    end
+    return ShardedNeRFDataset(files)
+end
+
+@resumable function iterate_batches(ds::ShardedNeRFDataset; batch_size::Int, rng::AbstractRNG=Random.GLOBAL_RNG, repeat::Bool=false)
+    shard_indices = randperm(rng, length(ds))
+    current_batch = nothing
+    while true
+        for shard in shard_indices
+            shard_rays = JLD2.load(ds.files[shard], "rays")
+            if current_batch === nothing
+                current_batch = shard_rays
+            else
+                current_batch = cat(current_batch, shard_rays; dims=3)
+            end
+            while size(current_batch)[end] >= batch_size
+                @yield current_batch[:, :, 1:batch_size]
+                current_batch = current_batch[:, :, batch_size+1:end]
+            end
+        end
+        if !repeat
+            break
+        end
+    end
+    if size(current_batch)[end] > 0
+        @yield current_batch
+    end
+end
