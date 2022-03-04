@@ -90,7 +90,22 @@ end
 
 function ModelMetadata(path::String)
     metadata = open(path, "r") do io
-        JSON3.load(io)
+        JSON3.read(io)
     end
-    ModelMetadata(metadata["min"], metadata["max"])
+    ModelMetadata(Vec3(metadata["min"]), Vec3(metadata["max"]))
 end
+
+struct NeRFDataset
+    metadata::ModelMetadata
+    views::Vector{FileNeRF}
+end
+
+function NeRFDataset(path::AbstractString)
+    metadata = ModelMetadata(joinpath(path, "metadata.json"))
+    img_paths = filter!(endswith("png"), readdir(path; join=true))
+    views = map(FileNeRF, img_paths)
+    return NeRFDataset(metadata, views)
+end
+
+Base.length(d::NeRFDataset) = length(d.views)
+Base.getindex(d::NeRFDataset, idx::Integer) = rays(d.views[idx])
