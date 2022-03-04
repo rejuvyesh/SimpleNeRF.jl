@@ -41,21 +41,21 @@ Returns 3x2xB array of (origin, direction) pairs
 """
 function bare_rays(cv::CameraView, width::Int, height::Int)
     z = collect(cv.camera_direction)
+    @check size(z) == (3,)
     rgh = collect(LinRange(-1, 1, height))
     rgh = reshape(rgh, 1, 1, size(rgh)...)
     ys = tan(cv.y_fov / 2) .* rgh .* collect(cv.y_axis)
+    @check size(ys) == (3, 1, height)
     rgw = collect(LinRange(-1, 1, width))
     rgw = reshape(rgw, 1, size(rgw)..., 1)
     xs = tan(cv.x_fov / 2) .* rgw .* collect(cv.x_axis)
-
-    @show size(xs)
-    directions = reshape(xs .+ ys .+ z, 3, :)
-    directions ./= map(norm, eachrow(directions))
-
+    @check size(xs) == (3, width, 1)
+    directions = reshape(xs .+ ys .+ z, 3, 1, :)
+    directions ./= map(norm, eachslice(directions; dims=1))
     co = collect(cv.camera_origin)
     co = reshape(co, size(co)..., 1, 1)
-    origins = reshape(repeat(co, 1, width, height), 3, :)
-    @check size(origins) == size(directions)
+    origins = reshape(repeat(co, 1, width, height), 3, 1, :)
+    @check size(origins) == size(directions) == (3, 1, height*width)
     return hcat(origins, directions)
 end
 
@@ -79,8 +79,8 @@ function rays(fn::FileNeRF)
     # Note: this is not the same as PIL.Image something about linear vs SRGB
     img = channelview(image(fn))
     bare = bare_rays(fn.cameraview, size(img)[begin+1:end]...) # TODO
-    colors = Float32.(reshape(img, 3, :))
-    return vcat(bare, reshape(colors, 1, size(colors)...))
+    colors = Float32.(reshape(img, 3, 1, :))
+    return hcat(bare, colors)
 end
 
 struct ModelMetadata
