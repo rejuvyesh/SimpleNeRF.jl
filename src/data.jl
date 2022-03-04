@@ -113,11 +113,9 @@ end
 Base.length(d::NeRFDataset) = length(d.views)
 Base.getindex(d::NeRFDataset, idx::Integer) = rays(d.views[idx])
 
-@resumable function iterate_batches(ds::NeRFDataset, savepath::AbstractString; rng::AbstractRNG=Random.GLOBAL_RNG, num_shards::Int=32, batch_size::Int=512, repeat::Bool=true)
+function iterate_batches(ds::NeRFDataset, savepath::AbstractString; rng::AbstractRNG=Random.GLOBAL_RNG, num_shards::Int=32, batch_size::Int=512, repeat::Bool=true)
     sd = ShardedNeRFDataset(ds, savepath; rng, num_shards)
-    for batch in iterate_batches(sd; batch_size, rng, repeat)
-        @yield batch
-    end
+    return iterate_batches(sd; batch_size, rng, repeat)
 end
 
 struct ShardedNeRFDataset{S<:AbstractString}
@@ -135,6 +133,11 @@ Base.length(ds::ShardedNeRFDataset) = length(ds.files)
 function ShardedNeRFDataset(ds::NeRFDataset, savepath::AbstractString; rng::AbstractRNG=Random.GLOBAL_RNG, num_shards::Int=32)
     if !isdir(savepath)
         mkpath(savepath)
+    else
+        files = filter!(endswith("jld2"), readdir(savepath; join=true))
+        if length(files) == num_shards
+            return ShardedNeRFDataset(files)
+        end
     end
     shards = Vector{Array{Float32,3}}(undef, num_shards)
     @progress for view in ds.views
