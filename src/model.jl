@@ -20,8 +20,9 @@ Flux.@functor NeRFModel (input_layers, mid_layers, density, color,)
 
 
 function sinusodial_emb(coords, freqs::Int)
-    coeffs = 2 .^ range(0, freqs)
-    inputs = reshape(coords, 1, size(coords)...) * coeffs
+    coeffs = 2 .^ range(0, freqs-1)
+    inputs = reshape(coords, 1, size(coords)...) .* coeffs
+    @check size(inputs) == (freqs, size(coords)...)
     sines = sin.(inputs)
     cosines = cos.(inputs)
     combined = vcat(sines, cosines)
