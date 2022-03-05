@@ -1,6 +1,6 @@
 using FileIO
 using ImageIO
-using Images: channelview
+using Images: channelview, RGB
 using LinearAlgebra
 using ArgCheck
 using Random
@@ -80,7 +80,7 @@ end
 function rays(fn::FileNeRF)
     # https://discourse.julialang.org/t/reading-png-rgb-channels-julia-vs-python/73599/12
     # Note: this is not the same as PIL.Image something about linear vs SRGB
-    img = channelview(image(fn))
+    img = channelview(RGB.(image(fn)))
     bare = bare_rays(fn.cameraview, size(img)[begin+1:end]...) # TODO
     colors = Float32.(reshape(img, 3, 1, :))
     return hcat(bare, colors)
