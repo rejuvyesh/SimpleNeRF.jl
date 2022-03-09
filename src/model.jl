@@ -1,7 +1,9 @@
 @option struct NeRFConfig
+    x_dim::Int=3
+    d_dim::Int=3
     n_input_layers::Int=5
     n_mid_layers::Int=4
-    hiddendim::Int=256
+    hidden_dim::Int=256
     color_layer_dim::Int=128
     x_freqs::Int=10
     d_freqs::Int=4
@@ -30,11 +32,16 @@ function sinusodial_emb(coords, freqs::Int)
 end
 
 function NeRFModel(;config::NeRFConfig)
-    input_layers = Chain()
-    mid_layers = Chain()
+    x_emb_dim = config.x_dim * 2 * config.x_freqs
+    d_emb_dim = config.d_dim * 2 * config.d_freqs
+    layers = [Dense(config.hidden_dim, config.hidden_dim, relu) for _ in 2:config.n_input_layers] 
+    input_layers = Chain(Dense(x_emb_dim, config.hidden_dim, relu), layers...)
 
-    density = Chain(Dense(hiddendim, 1), softplus)
-    color = Chain(Dense(hiddendim+ddim, config.color_layer_dim), relu, Dense(config.color_layer_dim, 3), tanh_fast)
+    layers = [Dense(config.hidden_dim, config.hidden_dim, relu) for _ in 2:config.n_mid_layers]
+    mid_layers = Chain(Dense(config.hidden_dim+x_emb_dim, config.hidden_dim), layers...)
+
+    density = Dense(config.hidden_dim, 1, softplus)
+    color = Chain(Dense(config.hidden_dim+d_emb_dim, config.color_layer_dim, relu), Dense(config.color_layer_dim, 3, tanh_fast))
     return NeRFModel(input_layers, mid_layers, density, color, config.x_freqs, config.d_freqs)
 end
 
