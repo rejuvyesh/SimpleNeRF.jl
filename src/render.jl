@@ -6,6 +6,24 @@ end
 Flux.@functor NeRFRenderer 
 
 function render_rays(nr::NeRFRenderer, batch; rng::AbstractRNG=Random.GLOBAL_RNG)
+    t_min, t_max, mask = t_range(batch)
+    coarse_ts = stratified_sampling(t_min, t_max, mask, coarse_ts; rng)
+    all_points = points(coarse_ts, batch)
+    direction_batch = repeat(batch[:, 2:3, :], (1, size(all_points, 1), 1))
+    coarse_densities, coarse_rgbs = nr.coarse(all_points, direction_batch)
+
+    coarse_outputs = render_rays(coarse_ts, coarse_densities, coarse_rgbs, background)
+
+    fine_ts = fine_sampling(coarse_ts, fine_ts, coarse_densities; rng)
+    all_points = points(fine_ts, batch)
+    fine_densities, fine_rgbs = nr.fine(all_points, direction_bath)
+
+    fine_outputs = render_rays(fine_ts, fine_densities, fine_rgbs, background)
+    return (coarse=coarse_outputs, fine=fine_outputs)
+end
+
+function t_range(batch; bbox_min, bbox_max, eps=1e-8)
+
 end
 
 struct RaySamples
