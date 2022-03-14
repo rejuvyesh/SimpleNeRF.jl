@@ -6,7 +6,7 @@ end
 Flux.@functor NeRFRenderer 
 
 function render_rays(nr::NeRFRenderer, batch; rng::AbstractRNG=Random.GLOBAL_RNG)
-    t_min, t_max, mask = t_range(batch)
+    t_min, t_max, mask = batched_t_range(batch)
     coarse_ts = stratified_sampling(t_min, t_max, mask, coarse_ts; rng)
     all_points = points(coarse_ts, batch)
     direction_batch = repeat(batch[:, 2:3, :], (1, size(all_points, 1), 1))
@@ -22,8 +22,25 @@ function render_rays(nr::NeRFRenderer, batch; rng::AbstractRNG=Random.GLOBAL_RNG
     return (coarse=coarse_outputs, fine=fine_outputs)
 end
 
-function t_range(batch; bbox_min, bbox_max, eps=1e-8)
+function batched_t_range(batch; bbox_min, bbox_max, eps=1e-8)
+    # batch: 3x2xB
+    origin = batch[:, 1, :]
+    direction = batch[:, 2, :]
 
+    offsets = bbox .- origin # 2 x 3 x B
+    ts = offsets ./ (direction .+ eps)
+    ts = hcat(minimum(ts, dims=2), maximum(ts, dims=2))
+
+    # Find overlapping and apply constraints
+    max_of_min = maximum(ts, dims=2)
+    min_t = relu(max_of_min)
+    max_t = minimum(ts, dims=2)
+    max_t_clipped = max.(max_t, min_t .+ min_t_range)
+    real_range = stack([min_t, max_t_clipped], dims=1)
+    null_range = repeat([0, min_t_range], size(real_range)[end])
+    mask = min_t .< max_t
+    bounds = ifelse.(mask, real_range, null_range)
+    return bounds[:, 1, :], bounds[:, 2, :], mask
 end
 
 struct RaySamples
