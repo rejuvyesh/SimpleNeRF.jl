@@ -29,3 +29,9 @@ fine_model = SimpleNeRF.NeRFModel(;config=SimpleNeRF.NeRFConfig())
 fine_densities, fine_rgbs = fine_model(all_points, dbatch)
 fine_densities = dropdims(fine_densities, dims=1)
 fine_outs = SimpleNeRF.render_rays(fine_ts, fine_densities, fine_rgbs, background)
+
+renderer = SimpleNeRF.NeRFRenderer(coarse_model, fine_model)
+out = SimpleNeRF.render_rays(renderer, batch; coarse_ts=coarse_ts_c, fine_ts=fine_ts_c, bbox_min, bbox_max, background)
+
+tbatch = ones(Float32, 3, 3, bs)
+ll = SimpleNeRF.losses(renderer, tbatch; coarse_ts=coarse_ts_c, fine_ts=fine_ts_c, bbox_min, bbox_max, background)

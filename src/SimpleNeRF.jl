@@ -33,4 +33,6 @@ include("model.jl")
 include("interpolations.jl")
 include("render.jl")
 
+include("train.jl")
+
 end

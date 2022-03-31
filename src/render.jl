@@ -5,8 +5,8 @@ end
 
 Flux.@functor NeRFRenderer 
 
-function render_rays(nr::NeRFRenderer, batch; rng::AbstractRNG=Random.GLOBAL_RNG)
-    t_min, t_max, mask = batched_t_range(batch)
+function render_rays(nr::NeRFRenderer, batch; coarse_ts, fine_ts, bbox_min, bbox_max, background, rng::AbstractRNG=Random.GLOBAL_RNG)
+    t_min, t_max, mask = batched_t_range(batch; bbox_min, bbox_max)
     coarse_ts = stratified_sampling(t_min, t_max, mask, coarse_ts; rng)
     all_points = points(coarse_ts, batch)
     direction_batch = repeat(batch[:, 2:2, :], 1, size(all_points, 2), 1)
