@@ -9,9 +9,10 @@ function render_rays(nr::NeRFRenderer, batch; rng::AbstractRNG=Random.GLOBAL_RNG
     t_min, t_max, mask = batched_t_range(batch)
     coarse_ts = stratified_sampling(t_min, t_max, mask, coarse_ts; rng)
     all_points = points(coarse_ts, batch)
-    direction_batch = repeat(batch[:, 2:3, :], (1, size(all_points, 1), 1))
+    direction_batch = repeat(batch[:, 2:2, :], 1, size(all_points, 2), 1)
     coarse_densities, coarse_rgbs = nr.coarse(all_points, direction_batch)
 
+    coarse_densities = dropdims(coarse_densities, dims=1)
     coarse_outputs = render_rays(coarse_ts, coarse_densities, coarse_rgbs, background)
 
     fine_ts = fine_sampling(coarse_ts, fine_ts, coarse_densities; rng)
@@ -23,7 +24,6 @@ function render_rays(nr::NeRFRenderer, batch; rng::AbstractRNG=Random.GLOBAL_RNG
 end
 
 function batched_t_range(batch; bbox_min, bbox_max, eps=1e-8, min_t_range=1e-3)
-    bs = size(batch)[end]
     bbox = cat(bbox_min, bbox_max; dims=ndims(bbox_min)+1)
 
     # batch: 3x2xB
@@ -60,11 +60,11 @@ end
 
 function stratified_sampling(t_min::AbstractVector, t_max::AbstractVector, mask, count::Int; rng=Random.GLOBAL_RNG)
     bin_size = (t_max .- t_min) ./ count
-    bin_size = reshape(bin_size, 1, size(bin_size)...)
-    tmp = collect(range(0, count))
-    bin_starts = reshape(tmp, 1, size(tmp)...) .* bin_size .+ reshape(t_min, 1, size(t_min)...)
+    bin_size = unsqueeze(bin_size, dims=1)
+    tmp = range(0, count-1)
+    bin_starts = unsqueeze(tmp, dims=2) .* bin_size .+ unsqueeze(t_min, dims=1)
     @check size(bin_starts) == (count, size(t_min, 1))
-    randoms = rand(rng, Uniform(), size(bin_starts)) .* bin_size
+    randoms = rand(rng, size(bin_starts)) .* bin_size
     ts = bin_starts .+ randoms
     return RaySamples(t_min, t_max, mask, ts)
 end
@@ -77,7 +77,7 @@ For each ray, compute the points at all timesteps
 Returns a batch of points of shape 3xTxB
 """
 function points(rs::RaySamples, rays)
-    return rays[begin:begin, :] + (rays[begin+1:end, :] .* reshape(rs.ts, 1, size(rs.ts)...))
+    return rays[:, begin:begin, :] .+ (rays[:, begin+1:end, :] .* unsqueeze(rs.ts, dims=1))
 end
 
 function starts(rs::RaySamples)
@@ -103,7 +103,8 @@ function termination_probs(rs::RaySamples, densities)
     prob_survive = exp.(-acc_densities_prev)
 
     # Probability of terminating at time t given we made it to time t
-    prob_terminate = vcat((1 .- exp.(-density_dt)), ones(eltype(densities), 1, size(rs.ts, 1)))
+    tmp2 = ones(eltype(densities), 1, size(rs.ts)[end])
+    prob_terminate = vcat((1 .- exp.(-density_dt)), tmp2)
 
     return prob_survive .* prob_terminate
 end
@@ -115,7 +116,7 @@ Volumetric rendering given density and color samples along a batch of rays.
 function render_rays(rs::RaySamples, densities::AbstractMatrix{T}, rgbs::AbstractArray{T,3}, background::AbstractVector{T}) where {T<:AbstractFloat}
     probs = termination_probs(rs, densities)
     colors = hcat(rgbs, repeat(reshape(background, size(background, 1), 1, 1) , 1, 1, size(rgbs)[end])) # TODO
-    return @. ifelse(reshape(rs.mask, 1, size(rs.mask)...), sum(reshape(probs, 1, size(probs)...) .* colors; dims=1), background)
+    return @. ifelse(unsqueeze(rs.mask, dims=1), sum(unsqueeze(probs, dims=1) .* colors; dims=1), background)
 end
 
 function fine_sampling(rs::RaySamples, count::Int, densities; combine::Bool=true, eps=Float32(1e-8), rng::AbstractRNG=Random.GLOBAL_RNG)
@@ -123,12 +124,12 @@ function fine_sampling(rs::RaySamples, count::Int, densities; combine::Bool=true
 
     # Setup an inverse CDF for inverse transform sampling
     xs = cumsum(w; dims=1)
-    xs = vcat(zeros(eltype(densities), 1, size(rs.ts, 1)), xs)
+    xs = vcat(zeros(eltype(densities), 1, size(rs.ts)[end]), xs)
     xs = xs ./ xs[end:end, :]
     ys = vcat(reshape(rs.t_min, 1, size(rs.t_min)...), ends(rs))
 
     # Evaluate the inverse CDF at quasi-random points.
-    input_samples = stratified_sampling(t_min, t_max, rs.mask, count; rng=rng)
+    input_samples = stratified_sampling(rs.t_min, rs.t_max, rs.mask, count; rng=rng)
     new_ts = batched_interpolate(input_samples.ts, xs, ys)
 
     if combine
