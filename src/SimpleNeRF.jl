@@ -8,6 +8,7 @@ using Flux
 using Functors
 using Optimisers
 using Configurations
+using MLUtils: stack
 
 # From https://github.com/FluxML/Functors.jl/issues/35
 # and https://github.com/FluxML/Optimisers.jl/pull/57

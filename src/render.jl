@@ -22,25 +22,33 @@ function render_rays(nr::NeRFRenderer, batch; rng::AbstractRNG=Random.GLOBAL_RNG
     return (coarse=coarse_outputs, fine=fine_outputs)
 end
 
-function batched_t_range(batch; bbox_min, bbox_max, eps=1e-8)
-    # batch: 3x2xB
-    origin = batch[:, 1, :]
-    direction = batch[:, 2, :]
+function batched_t_range(batch; bbox_min, bbox_max, eps=1e-8, min_t_range=1e-3)
+    bs = size(batch)[end]
+    bbox = cat(bbox_min, bbox_max; dims=ndims(bbox_min)+1)
 
-    offsets = bbox .- origin # 2 x 3 x B
+    # batch: 3x2xB
+    origin = batch[:, 1:1, :]
+    direction = batch[:, 2:2, :]
+
+    offsets = bbox .- origin # 3 x B
+    @check ndims(offsets) == 3
+
     ts = offsets ./ (direction .+ eps)
+    # search sorted
     ts = hcat(minimum(ts, dims=2), maximum(ts, dims=2))
 
+    @check size(ts) == size(offsets)
     # Find overlapping and apply constraints
-    max_of_min = maximum(ts, dims=2)
-    min_t = relu(max_of_min)
-    max_t = minimum(ts, dims=2)
+    max_of_min = maximum(ts[:, 1, :], dims=1)
+    min_t = relu.(max_of_min)
+    max_t = minimum(ts[:, 2, :], dims=1)
     max_t_clipped = max.(max_t, min_t .+ min_t_range)
-    real_range = stack([min_t, max_t_clipped], dims=1)
-    null_range = repeat([0, min_t_range], size(real_range)[end])
+    real_range = vcat(min_t, max_t_clipped)
+    null_range = reshape(vcat(0, min_t_range), 2, 1)
     mask = min_t .< max_t
     bounds = ifelse.(mask, real_range, null_range)
-    return bounds[:, 1, :], bounds[:, 2, :], mask
+    @check ndims(bounds) == 2
+    return bounds[1, :], bounds[2, :], dropdims(mask, dims=1)
 end
 
 struct RaySamples
