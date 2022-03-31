@@ -17,8 +17,10 @@ function render_rays(nr::NeRFRenderer, batch; rng::AbstractRNG=Random.GLOBAL_RNG
 
     fine_ts = fine_sampling(coarse_ts, fine_ts, coarse_densities; rng)
     all_points = points(fine_ts, batch)
-    fine_densities, fine_rgbs = nr.fine(all_points, direction_bath)
+    direction_batch = repeat(batch[:, 2:2, :], 1, size(all_points, 2), 1)
+    fine_densities, fine_rgbs = nr.fine(all_points, direction_batch)
 
+    fine_densities = dropdims(fine_densities, dims=1)
     fine_outputs = render_rays(fine_ts, fine_densities, fine_rgbs, background)
     return (coarse=coarse_outputs, fine=fine_outputs)
 end
@@ -116,7 +118,10 @@ Volumetric rendering given density and color samples along a batch of rays.
 function render_rays(rs::RaySamples, densities::AbstractMatrix{T}, rgbs::AbstractArray{T,3}, background::AbstractVector{T}) where {T<:AbstractFloat}
     probs = termination_probs(rs, densities)
     colors = hcat(rgbs, repeat(reshape(background, size(background, 1), 1, 1) , 1, 1, size(rgbs)[end])) # TODO
-    return @. ifelse(unsqueeze(rs.mask, dims=1), sum(unsqueeze(probs, dims=1) .* colors; dims=1), background)
+    fg = dropdims(sum(unsqueeze(probs, dims=1) .* colors; dims=2), dims=2)
+    bg = unsqueeze(background, dims=2)
+    ms = unsqueeze(rs.mask, dims=1)
+    return @. ifelse(ms, fg, bg)
 end
 
 function fine_sampling(rs::RaySamples, count::Int, densities; combine::Bool=true, eps=Float32(1e-8), rng::AbstractRNG=Random.GLOBAL_RNG)
