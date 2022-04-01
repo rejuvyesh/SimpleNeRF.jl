@@ -33,6 +33,7 @@ Flux = "0.12"
 JLD2 = "0.4"
 JSON3 = "1"
 ProgressLogging = "0.1"
+PyCallChainRules = "0.3"
 ResumableFunctions = "0.6"
 julia = "1"
 
