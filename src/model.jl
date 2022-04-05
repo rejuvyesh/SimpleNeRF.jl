@@ -23,12 +23,13 @@ Flux.@functor NeRFModel (input_layers, mid_layers, density, color,)
 
 function sinusodial_emb(coords, freqs::Int)
     coeffs = 2 .^ range(0, freqs-1)
-    inputs = reshape(coords, 1, size(coords)...) .* coeffs
+    coeffs = Flux.Adapt.adapt(typeof(coords), coeffs)
+    inputs = unsqueeze(coords, dims=1) .* coeffs
     @check size(inputs) == (freqs, size(coords)...)
     sines = sin.(inputs)
     cosines = cos.(inputs)
     combined = vcat(sines, cosines)
-    return reshape(combined, :, size(combined)[begin+2:end]...)
+    return (reshape(combined, :, size(combined)[begin+2:end]...))
 end
 
 function NeRFModel(;config::NeRFConfig)
@@ -48,7 +49,6 @@ end
 function (m::NeRFModel)(x, d)
     x_emb = sinusodial_emb(x, m.x_freqs)
     d_emb = sinusodial_emb(d, m.d_freqs)
-
     z = m.input_layers(x_emb)
     z1 = vcat(z, x_emb)
     z2 = m.mid_layers(z1)

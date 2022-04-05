@@ -9,4 +9,7 @@ using Test
     @testset "model" begin
         include("test_model.jl")
     end
+    @testset "render" begin
+        include("test_render.jl")
+    end
 end
